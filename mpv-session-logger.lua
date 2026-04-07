@@ -56,7 +56,7 @@ end
 
 local function snapshot_playlist()
     local playlist = mp.get_property_native("playlist") or {}
-    local playlist_pos = (mp.get_property_number("playlist-pos", 0) or 0) + 1
+    local playlist_pos = mp.get_property_number("playlist-pos", 0) + 1
     local entries = {}
 
     for i, item in ipairs(playlist) do
@@ -65,8 +65,8 @@ local function snapshot_playlist()
         local duration = 0
 
         if is_current then
-            time_pos = mp.get_property_number("time-pos", 0) or 0
-            duration = mp.get_property_number("duration", 0) or 0
+            time_pos = mp.get_property_number("time-pos", 0)
+            duration = mp.get_property_number("duration", 0)
         end
 
         entries[#entries + 1] = {
@@ -154,7 +154,7 @@ local function restore_session()
             if i == 1 then
                 mp.commandv("loadfile", item.filename, "replace")
             else
-                mp.commandv("loadfile", item.filename, "append-play")
+                mp.commandv("loadfile", item.filename, "append")
             end
         end
     end
@@ -195,7 +195,7 @@ local function maybe_offer_restore()
         clear_restore_prompt()
         mp.osd_message("Restore dismissed.")
     end)
-    mp.osd_message("Restore last MPV session?\nLeft click: Restore | ESC: Dismiss", 20)
+    mp.osd_message("Restore last mpv session?\nLeft click: Restore | ESC: Dismiss", 20)
     restore_prompt_timer = mp.add_timeout(20, function()
         clear_restore_prompt()
     end)
