@@ -20,6 +20,7 @@ local pending_state_update = false
 local function append_log(event_name, payload)
     local file = io.open(log_path, "a")
     if not file then
+        mp.msg.warn("Unable to open session log file: " .. tostring(log_path))
         return
     end
     local event = {
@@ -40,6 +41,7 @@ local function write_state()
     state.updated_at = os.time()
     local file = io.open(state_path, "w")
     if not file then
+        mp.msg.warn("Unable to open session state file: " .. tostring(state_path))
         return
     end
     local serialized = utils.format_json(state)
@@ -66,7 +68,8 @@ end
 
 local function snapshot_playlist()
     local playlist = mp.get_property_native("playlist") or {}
-    local playlist_pos = mp.get_property_number("playlist-pos", 0) + 1
+    local playlist_pos_raw = mp.get_property_number("playlist-pos", nil)
+    local playlist_pos = playlist_pos_raw and (playlist_pos_raw + 1) or -1
     local entries = {}
 
     for i, item in ipairs(playlist) do
@@ -89,7 +92,7 @@ local function snapshot_playlist()
     end
 
     state.playlist = entries
-    state.current_index = playlist_pos
+    state.current_index = (playlist_pos > 0 and playlist_pos <= #entries) and playlist_pos or 1
 end
 
 local function filenames_map(playlist)
