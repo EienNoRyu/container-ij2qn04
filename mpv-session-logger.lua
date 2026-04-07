@@ -13,6 +13,7 @@ local previous_playlist_filenames = {}
 local restore_prompt_active = false
 local restore_prompt_timer = nil
 local restore_prompt_seen = false
+local pending_state_update = false
 
 local function append_log(event_name, payload)
     local file = io.open(log_path, "a")
@@ -119,6 +120,10 @@ local function update_and_save()
     write_state()
 end
 
+local function queue_state_update()
+    pending_state_update = true
+end
+
 local function clear_restore_prompt()
     if restore_prompt_timer then
         restore_prompt_timer:kill()
@@ -186,7 +191,7 @@ local function maybe_offer_restore()
         clear_restore_prompt()
         mp.osd_message("Restore dismissed.")
     end)
-    mp.osd_message("Restore last MPV session?\nLeft click: Restore | Esc: Dismiss", 20)
+    mp.osd_message("Restore last MPV session?\nLeft click: Restore | ESC: Dismiss", 20)
     restore_prompt_timer = mp.add_timeout(20, function()
         clear_restore_prompt()
     end)
@@ -207,14 +212,21 @@ mp.observe_property("time-pos", "number", function(_, value)
     if value == nil then
         return
     end
-    update_and_save()
+    queue_state_update()
 end)
 
 mp.observe_property("duration", "number", function(_, value)
     if value == nil then
         return
     end
-    update_and_save()
+    queue_state_update()
+end)
+
+mp.add_periodic_timer(2, function()
+    if pending_state_update then
+        pending_state_update = false
+        update_and_save()
+    end
 end)
 
 mp.register_event("idle", function()
