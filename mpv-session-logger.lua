@@ -69,11 +69,11 @@ end
 local function snapshot_playlist()
     local playlist = mp.get_property_native("playlist") or {}
     local playlist_pos_raw = mp.get_property_number("playlist-pos", nil)
-    local playlist_pos = playlist_pos_raw and (playlist_pos_raw + 1) or -1
+    local playlist_pos = playlist_pos_raw and (playlist_pos_raw + 1) or nil
     local entries = {}
 
     for i, item in ipairs(playlist) do
-        local is_current = i == playlist_pos
+        local is_current = playlist_pos and i == playlist_pos
         local time_pos = 0
         local duration = 0
 
@@ -92,7 +92,7 @@ local function snapshot_playlist()
     end
 
     state.playlist = entries
-    state.current_index = (playlist_pos > 0 and playlist_pos <= #entries) and playlist_pos or 1
+    state.current_index = (playlist_pos and playlist_pos > 0 and playlist_pos <= #entries) and playlist_pos or 1
 end
 
 local function filenames_map(playlist)
@@ -212,7 +212,7 @@ local function maybe_offer_restore()
         clear_restore_prompt()
         mp.osd_message("Restore dismissed.")
     end)
-    mp.osd_message("Restore last mpv session?\nLeft click or R: Restore | ESC: Dismiss", 20)
+    mp.osd_message("Restore last mpv session?\nLeft-click or R: Restore | ESC: Dismiss", 20)
     restore_prompt_timer = mp.add_timeout(20, function()
         clear_restore_prompt()
     end)
