@@ -2,6 +2,8 @@ local utils = require("mp.utils")
 
 local log_path = mp.command_native({"expand-path", "~~/session_activity.log"})
 local state_path = mp.command_native({"expand-path", "~~/session_state.json"})
+local restore_seek_delay_seconds = 0.2
+local state_flush_interval_seconds = 2
 
 local state = {
     playlist = {},
@@ -97,18 +99,20 @@ local function detect_playlist_changes(new_playlist)
     for filename, count in pairs(current) do
         local old_count = previous[filename] or 0
         if count > old_count then
-            for _ = 1, (count - old_count) do
-                append_log("playlist_item_added", {filename = filename})
-            end
+            append_log("playlist_item_added", {
+                filename = filename,
+                count = count - old_count,
+            })
         end
     end
 
     for filename, count in pairs(previous) do
         local new_count = current[filename] or 0
         if count > new_count then
-            for _ = 1, (count - new_count) do
-                append_log("playlist_item_removed", {filename = filename})
-            end
+            append_log("playlist_item_removed", {
+                filename = filename,
+                count = count - new_count,
+            })
         end
     end
 
@@ -158,7 +162,7 @@ local function restore_session()
     local restore_index = saved.current_index or 1
     local current_item = saved.playlist[restore_index]
     local restore_time = current_item and current_item.time_pos or 0
-    mp.add_timeout(0.2, function()
+    mp.add_timeout(restore_seek_delay_seconds, function()
         mp.set_property_number("playlist-pos", math.max(0, restore_index - 1))
         if restore_time and restore_time > 0 then
             mp.commandv("seek", tostring(restore_time), "absolute", "exact")
@@ -222,7 +226,7 @@ mp.observe_property("duration", "number", function(_, value)
     queue_state_update()
 end)
 
-mp.add_periodic_timer(2, function()
+mp.add_periodic_timer(state_flush_interval_seconds, function()
     if pending_state_update then
         pending_state_update = false
         update_and_save()
