@@ -27,7 +27,12 @@ local function append_log(event_name, payload)
         event = event_name,
         payload = payload or {},
     }
-    file:write((utils.format_json(event) or "{}") .. "\n")
+    local serialized = utils.format_json(event)
+    if not serialized then
+        mp.msg.warn("Failed to serialize event log payload; writing empty object.")
+        serialized = "{}"
+    end
+    file:write(serialized .. "\n")
     file:close()
 end
 
@@ -37,7 +42,12 @@ local function write_state()
     if not file then
         return
     end
-    file:write(utils.format_json(state) or "{}")
+    local serialized = utils.format_json(state)
+    if not serialized then
+        mp.msg.warn("Failed to serialize session state; writing empty object.")
+        serialized = "{}"
+    end
+    file:write(serialized)
     file:close()
 end
 
@@ -135,6 +145,7 @@ local function clear_restore_prompt()
     end
     if restore_prompt_active then
         mp.remove_key_binding("restore_session_click")
+        mp.remove_key_binding("restore_session_key")
         mp.remove_key_binding("dismiss_restore_prompt")
         restore_prompt_active = false
     end
@@ -191,11 +202,14 @@ local function maybe_offer_restore()
     mp.add_forced_key_binding("MBTN_LEFT", "restore_session_click", function()
         restore_session()
     end)
+    mp.add_forced_key_binding("r", "restore_session_key", function()
+        restore_session()
+    end)
     mp.add_forced_key_binding("ESC", "dismiss_restore_prompt", function()
         clear_restore_prompt()
         mp.osd_message("Restore dismissed.")
     end)
-    mp.osd_message("Restore last mpv session?\nLeft click: Restore | ESC: Dismiss", 20)
+    mp.osd_message("Restore last mpv session?\nLeft click or R: Restore | ESC: Dismiss", 20)
     restore_prompt_timer = mp.add_timeout(20, function()
         clear_restore_prompt()
     end)
