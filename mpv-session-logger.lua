@@ -12,6 +12,7 @@ local state = {
 local previous_playlist_filenames = {}
 local restore_prompt_active = false
 local restore_prompt_timer = nil
+local restore_prompt_seen = false
 
 local function append_log(event_name, payload)
     local file = io.open(log_path, "a")
@@ -150,13 +151,14 @@ local function restore_session()
     end
 
     local restore_index = saved.current_index or 1
-    mp.set_property_number("playlist-pos", math.max(0, restore_index - 1))
-
     local current_item = saved.playlist[restore_index]
     local restore_time = current_item and current_item.time_pos or 0
-    if restore_time and restore_time > 0 then
-        mp.commandv("seek", tostring(restore_time), "absolute", "exact")
-    end
+    mp.add_timeout(0.2, function()
+        mp.set_property_number("playlist-pos", math.max(0, restore_index - 1))
+        if restore_time and restore_time > 0 then
+            mp.commandv("seek", tostring(restore_time), "absolute", "exact")
+        end
+    end)
 
     append_log("session_restored", {
         item_count = #saved.playlist,
@@ -167,7 +169,7 @@ local function restore_session()
 end
 
 local function maybe_offer_restore()
-    if restore_prompt_active then
+    if restore_prompt_active or restore_prompt_seen then
         return
     end
     local info = utils.file_info(state_path)
@@ -175,6 +177,7 @@ local function maybe_offer_restore()
         return
     end
 
+    restore_prompt_seen = true
     restore_prompt_active = true
     mp.add_forced_key_binding("MBTN_LEFT", "restore_session_click", function()
         restore_session()
