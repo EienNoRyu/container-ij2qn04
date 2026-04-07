@@ -2,7 +2,6 @@ local utils = require("mp.utils")
 
 local log_path = mp.command_native({"expand-path", "~~/session_activity.log"})
 local state_path = mp.command_native({"expand-path", "~~/session_state.json"})
-local restore_seek_delay_seconds = 0.2
 local state_flush_interval_seconds = 2
 
 local state = {
@@ -16,6 +15,7 @@ local restore_prompt_active = false
 local restore_prompt_timer = nil
 local restore_prompt_seen = false
 local pending_state_update = false
+local pending_restore = nil
 
 local function append_log(event_name, payload)
     local file = io.open(log_path, "a")
@@ -92,7 +92,11 @@ local function snapshot_playlist()
     end
 
     state.playlist = entries
-    state.current_index = (playlist_pos and playlist_pos > 0 and playlist_pos <= #entries) and playlist_pos or 1
+    if playlist_pos and playlist_pos > 0 and playlist_pos <= #entries then
+        state.current_index = playlist_pos
+    else
+        state.current_index = 1
+    end
 end
 
 local function filenames_map(playlist)
@@ -176,12 +180,10 @@ local function restore_session()
     local restore_index = saved.current_index or 1
     local current_item = saved.playlist[restore_index]
     local restore_time = current_item and current_item.time_pos or 0
-    mp.add_timeout(restore_seek_delay_seconds, function()
-        mp.set_property_number("playlist-pos", math.max(0, restore_index - 1))
-        if restore_time and restore_time > 0 then
-            mp.commandv("seek", tostring(restore_time), "absolute", "exact")
-        end
-    end)
+    mp.set_property_number("playlist-pos", math.max(0, restore_index - 1))
+    pending_restore = {
+        time = restore_time,
+    }
 
     append_log("session_restored", {
         item_count = #saved.playlist,
@@ -221,12 +223,12 @@ end
 mp.register_event("start-file", function()
     local path = mp.get_property("path")
     append_log("file_opened", {path = path})
-    update_and_save()
+    queue_state_update()
 end)
 
 mp.observe_property("playlist", "native", function(_, playlist)
     detect_playlist_changes(playlist or {})
-    update_and_save()
+    queue_state_update()
 end)
 
 mp.observe_property("time-pos", "number", function(_, value)
@@ -252,6 +254,13 @@ end)
 
 mp.register_event("idle", function()
     maybe_offer_restore()
+end)
+
+mp.register_event("file-loaded", function()
+    if pending_restore and pending_restore.time and pending_restore.time > 0 then
+        mp.commandv("seek", tostring(pending_restore.time), "absolute", "exact")
+    end
+    pending_restore = nil
 end)
 
 mp.register_event("shutdown", function()
